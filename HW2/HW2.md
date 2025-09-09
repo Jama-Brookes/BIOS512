@@ -1,1 +1,2 @@
-This is for homework 2.
+# Homework 2
+Example of editing documents in Git in HW3.
