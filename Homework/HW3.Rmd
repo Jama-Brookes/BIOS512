@@ -1,0 +1,118 @@
+---
+title: "HW3"
+output: html_document
+date: "2025-09-11"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+if (!dir.exists("intermediate")) dir.create("intermediate", recursive = TRUE)
+if (!exists("mdpre")) mdpre <- function(x) { print(x) }
+if (!exists("ggmd"))  ggmd  <- function(p) { print(p) }
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+patient_names <- read.csv(file = "/Users/brookesjj/git/BIOS512/data/patient_names.csv")
+patient_properties <- read.csv(file = "/Users/brookesjj/git/BIOS512/data/patient_properties.csv")
+#changing date columns to date variables)
+patient_names$BIRTHDATE <- as.Date(patient_names$BIRTHDATE, "%m/%d/%y")
+patient_names$DEATHDATE <- as.Date(patient_names$DEATHDATE, "%m/%d/%y")
+head(patient_names, n = 10)
+head(patient_properties, n = 10)
+```
+```{r}
+properties_wide <- patient_properties %>% 
+                        pivot_wider(id_cols = ID,
+                                    names_from = property,
+                                    values_from = value)
+
+patients_left <- patient_names %>% left_join(properties_wide,
+                              by = "ID")
+patients_left$FIRST <- gsub("[0-9]", "", patients_left$FIRST)
+patients_left$LAST <- gsub("[0-9]", "", patients_left$LAST)
+```
+
+```{r}
+#definding mdpre
+
+
+pat_charact <- subset(patients_left, select = MARITAL:GENDER)
+#patients_left %>% group_by(MARITAL) %>% tally()
+
+
+group_and_tally <- function(df, column){
+  df %>% 
+    group_by({{ column }}) %>% 
+      tally()
+}
+
+for (i in colnames(pat_charact)) {
+  cat("\nCounts for column:", i, "\n")
+  mdpre(group_and_tally(patients_left, !!sym(i)))
+}
+  
+
+```
+```{r}
+library(tidyverse)
+
+simplify_strings <- function(s){
+    s %>% 
+        str_to_lower() %>%
+        str_trim() %>%
+        str_replace_all("[^a-z1-9]+","_") %>%
+        str_replace_all("^_+","") %>% # added these lines after looking at the data
+        str_replace_all("_+$","");
+}                                          
+
+df <- read_csv("Documents/MPH/Fall2025/BIOS512/Lectures/Lecture 4/source_data/character-data.csv")
+
+names(df) <- simplify_strings(names(df)); ## simplify our column names
+                                          ## as well
+                                          
+
+deduplicated <- df %>% mutate(across(everything(), simplify_strings)) %>%
+    distinct();
+    
+write_csv(deduplicated, "derived_data/deduplicated.csv");
+    
+mdpre(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% decrease)",
+              nrow(df),
+              nrow(deduplicated),
+              100-100*nrow(deduplicated)/nrow(df)));
+
+mddf(deduplicated, n=100)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+#creating age variable
+
+patients_left <- patients_left %>%
+                    mutate(AGE = round(ifelse(!is.na(patients_left$DEATHDATE), 
+                                     as.numeric(patients_left$DEATHDATE - patients_left$BIRTHDATE)/365, 
+                                     as.numeric(Sys.Date() - patients_left$BIRTHDATE)/365)
+                           ))
+#checking age variable
+head(patients_left, 10)
+
+#creating histogram
+library(ggplot2)
+
+patients_left %>% ggplot(aes(x=AGE, fill = factor(GENDER))) + 
+  geom_histogram(position="identity") +
+    theme_bw() +
+     labs(x="Age",y="Count of Participants",title="Age Distribution") +
+     theme(plot.title = element_text(hjust = 0.5))
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
