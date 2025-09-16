@@ -1,0 +1,430 @@
+---
+title: "Homework 4"
+output: pdf_document
+pdf_document: default
+html_document: default
+---
+
+# Homework 04
+Name: Jama Brookes
+
+For questions 2-6, please use hw4.zip, which contains a data base of patient/hopsital data.
+
+```{r}
+#convert_ipynb("./BIOS512_HW4.ipynb", output = xfun::with_ext("./BIOS512_HW4.ipynb", "Rmd"))
+```
+
+## Question 1
+*For this question, you can either import these tables into R and do each join, or create the tables we expect to see in a Markdown cell.*   
+Please see the tables below.  
+
+```{r}
+library(tidyverse)
+
+table_a <- tibble(
+  SKU = c(102345, 104567, 108912, 109876, 112233),
+  Fruit = c("Apple", "Orange", "Mango", "Blueberry", "Watermelon"),
+  Color = c("Red", "Orange", "Yellow", "Blue", "Green"),
+  Price = c(1.20, 1.40, 1.70, 3.50, 4.40),
+  In_Stock = c("Yes", "Yes", "No", "Yes", "No")
+)
+
+table_b <- tibble(
+  SKU = c(102345, 105432, 106789, 104567, 107654),
+  Fruit = c("Apple", "Banana", "Grape", "Orange", "Pear"),
+  Color = c("Red", "Yellow", "Purple", "Orange", "Green"),
+  Sale_Price = c(1.00, 0.50, 2.00, 1.20, 1.10),
+  Number_in_Stock = c(50, 120, 0, 75, 0)
+)
+```
+
+What would the result be if you did...  
+a) Left join  
+b) Right join  
+c) Inner join  
+d) Full join  
+e) Semi join  
+f) Anti join  
+
+```{r}
+#a) left join: 
+table_a %>% left_join(table_b, by = "SKU")
+
+#all rows in table_a will be kept according to SKU and table_b rows will be dropped that do not match SKU
+```
+
+```{r}
+#b) right join
+table_a %>% right_join(table_b, by = "SKU")
+
+#all rows in table_b will be kept according to SKU and table_a rows will be dropped that do not match SKU according to SKU
+```
+
+```{r}
+#c) Inner join
+table_a %>% inner_join(table_b, by = "SKU")
+
+#only rows with matching information in x and y will be kept by SKU
+```
+
+```{r}
+#d) Full join
+table_a %>% full_join(table_b, by = "SKU")
+
+#every row and column will be kept and missing values will be NA
+```
+
+```{r}
+#e) Semi join
+table_a %>% semi_join(table_b, by = "SKU")
+
+#all rows in table_a will be returned that have a match with table_b according to SKU
+```
+
+```{r}
+#f) Anti join
+table_a %>% anti_join(table_b, by = "SKU")
+
+#all rows in table_a will be returned that do not have a match with table_b according to SKU
+```
+
+## Question 2
+Inspect the data sets in our database!  
+a) Import them.  
+b) Check out the columns and their variable types using one of R's tibble summary functions.
+
+```{r}
+#a) import
+demographics <- read.csv("./hw4/demographics.csv")
+full <- read.csv("./hw4/full.csv")
+hospitals <- read.csv("./hw4/hospitals.csv")
+patient_names <- read.csv("./hw4/patient_names.csv")
+treatment_info <- read.csv("./hw4/treatment_info.csv")
+
+#b) check out data
+#demographics
+head(demographics)
+```
+
+```{r}
+#full
+head(full)
+str(full)
+```
+
+```{r}
+#patient_names
+head(patient_names)
+```
+
+```{r}
+#hospitals
+head(hospitals)
+```
+
+```{r}
+#treatment_info
+head(treatment_info)
+```
+
+## Question 3
+Using the `full.csv` data set from our database, **pivot longer** by making all of the variables the same type. Use both `patient_ID` and `name` as ID variables. After pivoting, get a `tally` for number of observations per `patient ID`/`name`. (*Hint: We did this in lecture 5!*)  
+```{r}
+full_long <- pivot_longer(full, age:patient_zipcode,
+                          names_to = "property",
+                          values_to = "observation",
+                          values_transform = function(x) 
+                            ifelse(is.na(x), NA, as.character(x)))
+head(full_long)
+
+#tally number of observations
+full_long %>% 
+  group_by(name,patient_id) %>% 
+    tally() %>% 
+      arrange()
+```
+
+
+## Question 4
+Pivot longer by making one column per data type. Use both `patient_ID` and `name` as ID variables. After pivoting, get a `tally` for number of each type of observation per `patient ID`/`name`.  
+
+**Helpful Hints:**  
+1. You're performing 3 seperate pivots with careful column selection then joining them after! 
+
+2. After each pivot, add the code below to create a unique row number:  
+```
+%>%
+group_by(patient_id, name) %>%
+  mutate(row = row_number()) %>%
+  ungroup()
+```
+3. To create the tally, add what is below after your grouping statement:   
+```
+%>%
+summarise(
+    n_chr  = sum(!is.na(value_chr)),
+    n_num  = sum(!is.na(value_num)),
+    n_date = sum(!is.na(value_date)),
+    .groups = "drop"
+```
+```{r}
+chr_col <- c('gender', 'race', 'ethnicity', 'condition', 'treatment', 'department', 'hospital', 
+             'patient_address', 'patient_city', 'patient_state')
+int_col <- c('age', 'patient_zipcode')
+date_col <- c('admission_date', 'release_date')
+
+#updating date columns to be date variable types
+full$admission_date <- as.Date(ifelse(full$admission_date  > Sys.Date(), 
+  format(full$admission_date , "19%y-%m-%d"), 
+  format(full$admission_date )))
+full$release_date <- as.Date(ifelse(full$release_date > Sys.Date(), 
+  format(full$release_date, "19%y-%m-%d"), 
+  format(full$release_date)))
+
+#pivoting character columns
+full_chr_long <- full %>% pivot_longer( 
+                          cols = all_of(chr_col),
+                          names_to = "chr_col",
+                          values_to = "value_chr")
+full_chr_long <- full_chr_long %>%
+group_by(patient_id, name) %>%
+  mutate(row = row_number()) %>%
+  ungroup()
+
+full_chr_long <- full_chr_long %>% 
+                    select(!(age:patient_zipcode)) #removing unwanted columns
+
+#pivoting integer columns
+full_int_long <- full %>% pivot_longer( 
+                          cols = all_of(int_col),
+                          names_to = "int_col",
+                          values_to = "value_num")
+full_int_long <- full_int_long %>%
+group_by(patient_id, name) %>%
+  mutate(row = row_number()) %>%
+  ungroup()
+
+full_int_long <- full_int_long %>% 
+                    select(!(gender:patient_state)) #removing unwanted columns
+
+#pivoting date columns
+full_date_long <- full %>% pivot_longer( 
+                          cols = all_of(date_col),
+                          names_to = "dat_col",
+                          values_to = "value_date")
+full_date_long <- full_date_long %>%
+group_by(patient_id) %>%
+  mutate(row = row_number()) %>%
+  ungroup()
+
+full_date_long <- full_date_long %>% 
+                    select(!(age:patient_zipcode)) #removing unwanted columns
+
+
+full_long_type <- full_join(full_chr_long, full_int_long, full_date_long, 
+                            by = c("patient_id", "name", "row")) %>% 
+                      full_join(full_date_long, by = c("patient_id", "name", "row"))
+
+full_long_type %>%
+    group_by(patient_id, name) %>% 
+    summarise(
+        n_chr  = sum(!is.na(value_chr)),
+        n_num  = sum(!is.na(value_num)),
+        n_date = sum(!is.na(value_date)),
+        .groups = "drop")
+
+```
+
+## Question 5
+Match patient names to the name of the hospital they were treated at.  
+*Hint: You'll need `patient_names.csv` and `hospitals.csv`.*
+```{r}
+patient_hospitals <- patient_names %>% 
+                                    left_join(hospitals, 
+                                              by = "hospital_id") %>% 
+                                        select(c("name", "hospital_name"))
+as_tibble(patient_hospitals)
+```
+
+## Question 6
+
+Using joins, create a table that shows `patient_id`, `name`, `age`, `gender`, `condition`, and `treatment`.   
+*Hint: You'll need `patient_names.csv`, `demographics.csv`, and `treatment_info.csv`.*
+```{r}
+patient_demo_dx <- full_join(patient_names, demographics, by = "patient_id") %>% 
+                        left_join(treatment_info, by = "condition_id") %>% 
+                            select(c('patient_id', 'name', 
+                                     'age', 'gender', 
+                                     'condition', 'treatment'))
+as_tibble(patient_demo_dx)
+```
+
+
+## Question 7
+Let's revisit the NOFORC workshop.  
+Below is what we completed in class on 9/9.  
+**Please note: This contains the skimr library. Make sure you install that package! See the link for instructions: https://github.com/rjenki/BIOS512#adding-packages-to-installr-later.**  
+
+```{r include = FALSE}
+
+# Load UFO sightings data from a GitHub CSV
+df <- read_csv("https://raw.githubusercontent.com/Vincent-Toups/bios512/refs/heads/main/nuforc_workshop/nuforc_sightings.csv")
+
+# Read column names
+names(df)
+
+# Count the occurrences of each unique 'shape' value
+unique_vals <- df$shape %>% table()
+
+# Sort the counts of shapes in descending order and get the names
+unique_vals %>% sort(decreasing = T) %>% names()
+
+# Store column names in a vector
+column_names <- names(df)
+
+# Total number of rows in the dataset
+n_total <- nrow(df)
+
+# Total number of rows in the dataset
+n_total <- nrow(df)
+
+# Loop over each column to get basic summary stats
+for(col in column_names) {
+  values <- df[[col]];        # Extract column
+  n_na <- sum(is.na(values))  # Count number of NA values
+    
+  unique_vals <- values %>% table() %>% sort(decreasing = T)  # Count unique values and sort them by frequency
+  n_unique <- length(unique_vals)
+    
+  cat(sprintf("%s:\n", col))  # Print column name
+  
+  # Print number and percent of NA values
+  cat(sprintf("\tnumber of NA values %d (%0.2f %%)\n", n_na, 100*n_na/n_total)) 
+  
+  # If column has fewer than 150 unique values, print them all
+  if(n_unique < 150) cat(sprintf("\t\t%s\n", names(unique_vals) %>% paste(collapse=", "))) 
+  
+  # Print number and percent of unique values
+  cat(sprintf("\tnumber of unique values %d (%0.2f %%)\n", length(unique_vals),
+    100*length(unique_vals)/n_total))
+}
+
+# Count number of reports per state and sort ascending
+df %>% group_by(state) %>% tally() %>% arrange(n)
+
+# Extract the 'occurred' column as a vector
+df %>% pull(occurred)
+
+# Helper function: nth(n) returns a function that extracts the nth element of a vector
+nth <- function(n) function(a) a[n]
+
+# Custom function to parse date strings by splitting on - / space : characters
+parse_date <- function(s){
+                          space_split <- s %>% str_split("[-/ :]")
+                          tibble(d1 = Map(nth(1), space_split) %>% as.character(),
+                                      d2 = Map(nth(2), space_split) %>% as.character(),
+                                      d3 = Map(nth(3), space_split) %>% as.character(),
+                                      d4 = Map(nth(4), space_split) %>% as.character(),
+                                      d5 = Map(nth(5), space_split) %>% as.character())
+}
+
+# Apply the parsing function to the 'occurred' column
+date_stuff <- parse_date(df %>% pull(occurred))
+head(date_stuff, 10)
+
+# Histogram of the second component of the split date (likely month)
+ggplot (date_stuff, aes(d2))+ geom_bar() + labs(x = "Month", y = "Count")
+
+# Install and load the skimr package for a nicer summary
+library(skimr)
+
+# Quick summary of the dataset
+skim_output <- skimr::skim(df)
+
+# Count occurrences for categorical columns
+df %>% count(country, sort = TRUE)
+df %>% count(state, sort = TRUE)
+df %>% count(shape, sort = TRUE)
+
+# Convert 'occurred' and 'reported' to proper date-time format using lubridate
+df <- df %>%
+  mutate(
+  occurred = lubridate::mdy_hm(occurred, quiet = TRUE),
+  reported = lubridate::mdy_hm(reported, quiet = TRUE)
+  )
+
+# Plot UFO sightings per year
+df %>%
+  filter(!is.na(occurred)) %>%
+  count(year = lubridate::year(occurred)) %>%
+  ggplot(aes(year, n)) +
+  geom_line() +
+    labs(title = "UFO Sightings per Year", x = "Year", y = "Number of Reports")
+
+```
+
+For the columns that have a low (relative to this dataset, which has ~150,000 observation) number of unique values, create a table that lists these unique values in ascending order.
+
+
+```{r}
+#Answer to Question 7:
+
+#arranging low count unique values in ascending order by count
+df_unique <- as.data.frame(unique_vals)
+colnames(df_unique) <- c("unique_value", "count")
+
+filtered_unique_vals <- df_unique %>% 
+                          filter(count < 150) %>% 
+                            group_by(count) %>% 
+                             arrange()
+
+as_tibble(filtered_unique_vals)
+
+#arranging ascending by name of unique_value
+low_unique <- function(x, threshold) {
+    unique_vals2 <- table(df[[col]])
+  filtered_vals <- unique_vals2[unique_vals2 < threshold]
+  cat("\n--- Unique values in Ascending Order ---\n")
+    print(sort(names(filtered_vals)))
+}
+
+low_unique(unique_vals, 150)
+
+
+```
+
+## Question 8
+Make a plot of number of UFO sightings by state (United States only). You can filter out states that only have one observation.
+
+```{r}
+
+#filtering data to only USA
+UFO_USA <- df %>% 
+            filter(country == "USA") %>% 
+            filter(state != "-") #filtering out state "-"
+
+#counting state sightings and limiting the data to each observation > 1
+UFO_state_count <- UFO_USA %>% count(state, sort= T) %>% filter(n > 1) %>% as.data.frame()
+
+colnames(UFO_state_count) <- c("state", "count")
+
+ggplot(UFO_state_count, aes(state, count)) +
+  geom_bar(stat = "identity") + 
+  theme_classic() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+  labs(title = "UFO Sightings in each US State", y= "Number of Sightnings", x = "US States & Territories")
+
+#plotting data on US map, excluding DC, PR, & US Territories
+
+library(usmap)
+
+UFO_state_count2 <- UFO_state_count %>%
+  mutate(state = state.name[match(state, state.abb)])  #Converting "CA" to "California" for map data
+
+#plotting US sightings on map
+plot_usmap(data = UFO_state_count2, regions = "states", values = "count") +
+  scale_fill_continuous(name = "Sightings", label = scales::comma) +
+  theme_void() +
+  labs(title = "UFO Sightings in US State", ) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
