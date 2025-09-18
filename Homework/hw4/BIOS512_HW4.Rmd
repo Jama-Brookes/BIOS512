@@ -95,11 +95,11 @@ b) Check out the columns and their variable types using one of R's tibble summar
 
 ```{r}
 #a) import
-demographics <- read.csv("./hw4/demographics.csv")
-full <- read.csv("./hw4/full.csv")
-hospitals <- read.csv("./hw4/hospitals.csv")
-patient_names <- read.csv("./hw4/patient_names.csv")
-treatment_info <- read.csv("./hw4/treatment_info.csv")
+demographics <- read.csv("./hw4_data/demographics.csv")
+full <- read.csv("./hw4_data/full.csv")
+hospitals <- read.csv("./hw4_data/hospitals.csv")
+patient_names <- read.csv("./hw4_data/patient_names.csv")
+treatment_info <- read.csv("./hw4_data/treatment_info.csv")
 
 #b) check out data
 #demographics
@@ -403,12 +403,29 @@ UFO_USA <- df %>%
             filter(country == "USA") %>% 
             filter(state != "-") #filtering out state "-"
 
+#checking missing
+UFO_USA_Missing <- df %>% filter(state == "-")
+UFO_USA_Missing
+
+#noticing Fl and FL, checking cities
+ df %>%  filter(state == "Fl") #cities match FL
+ UFO_USA <- mutate_all(UFO_USA, .fun = toupper) #making all uppercase before count
+
 #counting state sightings and limiting the data to each observation > 1
-UFO_state_count <- UFO_USA %>% count(state, sort= T) %>% filter(n > 1) %>% as.data.frame()
+UFO_state_count <- UFO_USA %>% 
+                      count(state, sort= T) %>% 
+                          filter(n > 1) %>% 
+                              arrange(desc(n)) %>% 
+                                as.data.frame()
 
 colnames(UFO_state_count) <- c("state", "count")
 
-ggplot(UFO_state_count, aes(state, count)) +
+UFO_state_count
+```
+```{r}
+#plotting UFO Sighting in each State
+
+ggplot(UFO_state_count, aes(reorder(state, -count), count)) +
   geom_bar(stat = "identity") + 
   theme_classic() +
   theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
@@ -425,6 +442,8 @@ UFO_state_count2 <- UFO_state_count %>%
 plot_usmap(data = UFO_state_count2, regions = "states", values = "count") +
   scale_fill_continuous(name = "Sightings", label = scales::comma) +
   theme_void() +
-  labs(title = "UFO Sightings in US State", ) +
+  labs(title = "UFO Sightings in each US State", ) +
   theme(plot.title = element_text(hjust = 0.5))
 ```
+
+
