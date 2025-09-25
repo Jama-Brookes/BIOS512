@@ -1,0 +1,210 @@
+---
+title: "Homework 5"
+output: pdf_document
+pdf_document: default
+html_document: default
+---
+
+# Homework 5
+Student: Jama Brookes
+
+This homework requires `wine.csv`, and the `tidyverse` and `Rtsne` packages. Install them if you haven't already!  
+See the following link for how to add new packages to Binder: https://github.com/rjenki/BIOS512?tab=readme-ov-file#adding-packages-to-installr-later.   
+**For readability and easier processing, please make each question part a different code chunk.**
+
+```{r}
+#exporting to rmd
+#library(rmarkdown)
+#convert_ipynb("./BIOS512_hw5_Brookes.ipynb", output = xfun::with_ext("./BIOS512_HW5_Brookes.ipynb", "Rmd"))
+```
+
+```{r}
+library(tidyverse)
+library(Rtsne)
+```
+
+## Question 1  
+
+#### a) Import your data.  
+```{r}
+wine <- read.csv("./hw5_data/wine.csv")
+```
+
+#### b) Check out the columns present using one of R's data frame summary.
+```{r}
+str(wine)
+
+#changing class to character
+
+wine$class <- as.character(wine$class)
+
+str(wine)
+
+```
+
+#### c) Get summary statistics on the numeric variables.  
+```{r}
+wine %>% select(where(is.numeric)) %>% 
+  summary()
+```
+
+
+## Question 2
+
+#### a) Scale and center your data  
+*Hint:* Use a `mutate()` statement across all columns **except class** with `function(x) as.numeric(scale(x))`.
+```{r}
+wine_scaled <- wine %>% 
+  mutate(across(where(is.numeric), ~as.numeric(scale(.))))
+
+summary(wine_scaled)
+```
+
+
+#### b) Based on what you saw in the summary statistic table from the imported data, why would scaling and centering this data be helpful before we perform PCA?
+
+It is helpful because the raw data is not centered around a common point. All the summary values
+range to varying degrees above zero, and it is difficult to work with the data
+without a standardized or centered scale. We have to scale and center so PCA can rotate around
+a common center.
+
+
+## Question 3
+
+#### a) Perform PCA
+
+```{r}
+PCA_wine <- wine_scaled %>% select(where(is.numeric)) %>% 
+                                  prcomp(); # runs PCA on d
+PCA_wine
+summary(PCA_wine)
+```
+
+
+#### b) How much of the total variance is explained by PC1? PC2? What function do we use to see that information?
+```{r}
+#PC1 Proportion of variance + PC2 proportion of variance
+0.361+0.1921
+```
+
+Total Proportion of Variance explained by PC1 and PC2 is 0.5531.
+
+
+#### c) Why are we doing PCA first?
+Reduces noise and dimensionality in the data.
+It also helps to capture the most variation in the data to create new axes.
+
+#### d) What is the rotation matrix? Print it explicitly.  
+*Hint:* Check the notes for a simple way to do this!
+```{r}
+
+print(PCA_wine$rotation) # PCA_wine$rotation is the rotation matrix
+
+```
+
+
+#### e) Plot PC1 vs. PC2, using the wine class as labels for coloring.  
+*Hint:* You'll first need a data set with only PC1 and PC2, then add back the class variable from your scaled data set with a `mutate()` statement. Then, you can use `color = factor(class)` in your `ggplot` statement.
+```{r}
+PC1_PC2_only <- PCA_wine$x %>% as.data.frame() %>%  select(c("PC1", "PC2"))
+
+PC1_PC2_only$class <-wine_scaled$class
+
+#plotting PC1 vs PC2
+
+library(ggplot2)
+ggplot(PC1_PC2_only, aes(x = PC1, y = PC2, color = factor(class))) +
+  geom_point() +
+  labs(color = "Class") +
+  theme_bw()
+```
+
+#### f) What do you see after plotting PC1 vs. PC2? What does this mean in context of wine classes?
+The wine classes are clustered on the graph, but overlap some on the PC1 and PC2 axis. 
+Class 2 shares some similarities with Class 1 and 2. However, there seems to be
+distinct clustering on chemical profiles that define the different wine classes.
+
+#### g) Give an example of data where PCA would fail. You can describe the data or do a simulation.  
+*Hint:* Our notes have a few examples!
+PCA would fail on a dataset with a non-linear space. 
+A real life example of this would be calculating differences in a dataset of facial expressions.
+This dataset would not be linear because facial expression patterns could not be maniuplated
+on a linear space.
+Example simulation:
+
+```{r}
+circular_data <- tibble(r = sample(c(2,5),size=650,replace=TRUE) + rnorm(650,0,0.5),
+            theta = runif(650,0,2*pi)) %>%
+    transmute(x=r*cos(theta),
+              y=r*sin(theta));
+ggplot(circular_data, aes(x,y)) + geom_point() + coord_fixed()
+```
+
+
+#### h) Explain the difference between vector space and manifold, and how these terms apply to what we did/will do with T-SNE.
+A vector space is a set of variables along a field that follow a mathematical structure that assumes linearity,
+which means they can be added and scale them.
+
+The manifold is the local vector space of a set. While a vector space assumes linearity, a manifold
+can be non-linear but resembles the local vector space. 
+
+In PAC, we scaled the data and placed it on a vector space by rotating individual points.
+In T-SNE, it assumes the data lies on a manifold and preserves local neighborhood 
+relationships to calculate the probability
+that two points are neighbors.
+
+## Question 4
+#### a) Perform T-SNE
+Set `seed = 123`.  
+*Hint:* Subset your PCA results to PC1–PC10, add the class variable back in, remove duplicates, then perform T-SNE.
+
+```{r}
+library(Rtsne)
+
+wine_PCA_DF <- PCA_wine$x %>% as.data.frame() %>% select(PC1:PC10)
+
+#adding wine class back
+wine_PCA_DF$class <- wine$class
+
+#removing duplicates
+wine_PCA_no_duplicates <- wine_PCA_DF %>% filter(!duplicated(.))
+
+str(wine_PCA_no_duplicates)
+
+set.seed(123)
+
+tsne_wine <- wine_PCA_no_duplicates %>% select(-class) %>% 
+                  Rtsne(.,
+                  dims = 2,
+                  perplexity = 30,
+                  verbose = FALSE,
+                  check_duplicates = FALSE
+                )
+
+
+```
+
+
+#### b) Plot the results in 2D
+*Hint:* Convert your T-SNE results to a tibble and add back the class variable from your scaled data set using a `mutate()` statement. Then, you can use `color = factor(class)` in your `ggplot` statement.
+
+```{r}
+results <- as_tibble(tsne_wine$Y)
+
+ggplot(results, aes(V1, V2)) + geom_point(aes(color = factor(wine_PCA_DF$class)))
+```
+
+
+#### c) Why didn't we stop at PCA?
+We didn't stop at PCA because while PCA is great at reducing redundancy and dimensionality in the data, 
+T-SNE is better are visualizing the complex spacial relationship of this data by
+predicting the probability of two points being neighbors. This helps visualize
+the similarities and differences of the wine classes in the original data.
+
+#### d) What other types of data does this workflow make sense for?
+Genomics and gene expression data would make sense
+because of the complex biological relationships/clusters that exist.
+Another type of data would be neural activity data because it has
+high dimensionality and noisiness but could be reduced to determine clustering.
+
+
