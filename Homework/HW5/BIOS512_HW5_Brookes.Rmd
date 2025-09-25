@@ -1,8 +1,6 @@
 ---
 title: "Homework 5"
 output: pdf_document
-pdf_document: default
-html_document: default
 ---
 
 # Homework 5
@@ -16,6 +14,7 @@ See the following link for how to add new packages to Binder: https://github.com
 #exporting to rmd
 #library(rmarkdown)
 #convert_ipynb("./BIOS512_hw5_Brookes.ipynb", output = xfun::with_ext("./BIOS512_HW5_Brookes.ipynb", "Rmd"))
+
 ```
 
 ```{r}
