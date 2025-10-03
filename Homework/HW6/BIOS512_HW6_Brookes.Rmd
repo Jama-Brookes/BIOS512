@@ -288,7 +288,7 @@ If you want nicer colors, you can add `scale_fill_viridis_c()` (or another color
 character_order <- dialog_len_per_ep %>% 
   group_by(character) %>% 
   summarise(mean_of_means = mean(mean_dialog_length)) %>% 
-  arrange(desc(mean_of_means)) %>% 
+  arrange(mean_of_means) %>% 
   pull(character)
 
 dialog_len_per_ep <- dialog_len_per_ep %>% 
