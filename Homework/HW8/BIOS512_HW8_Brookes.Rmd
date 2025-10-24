@@ -1,0 +1,164 @@
+---
+title: BIOS 512 HW 8
+output: pdf_document
+---
+
+# Homework 08
+## Student Name: Jama Brookes
+This homework is based on the clustering lectures. Check the lecture notes and TA notes - they should help!
+
+```{r, include=FALSE}
+library(dplyr)
+```
+
+
+## Question 1
+This question will walk you through creating your own `kmeans` function.
+
+
+#### a) What are the steps of `kmeans`?
+**Hint**: There are 4 steps/builder functions that you'll need.
+
+1. Assign points to clusters at random:
+2. Compute cluster means:
+Calculate average position of points inside cluster
+3. Iterate and reassign labels
+4. Recompute means
+Treat the calculated centers as the official centers
+
+
+#### b) Create the builder function for step 1.
+```{r}
+label_randomly <- function(n_points, n_clusters){
+  sample((1:n_points %% n_clusters) + 1, n_points)
+}
+
+```
+
+
+#### c) Create the builder function for step 2.
+```{r}
+get_cluster_means <- function(data, labels){
+  data %>%
+    mutate(label__ = labels) %>%        # create the label column
+    group_by(label__) %>%               # group by the same name
+    summarize(across(everything(), mean), .groups = "drop") %>%
+    arrange(label__)
+}
+```
+
+
+#### d) Create the builder function for step 3.
+*Hint*: There are two ways to do this part - one is significantly more efficient than the other. You can do either.
+```{r}
+assign_cluster <- function(data, means){
+  data_matrix <- as.matrix(data)
+  means_matrix <- as.matrix(means %>% dplyr::select(-label__))
+  dii <- sort(rep(1:nrow(data), nrow(means)))
+  mii <- rep(1:nrow(means), nrow(data))
+  data_repped <- data_matrix[dii, ]
+  means_repped <- means_matrix[mii, ]
+  diff_squared <- (data_repped - means_repped)^2
+  all_distances <- rowSums(diff_squared)
+  tibble(dii=dii, mii=mii, distance=all_distances) %>%
+    group_by(dii) %>%
+    arrange(distance) %>%
+    filter(row_number()==1) %>%
+    ungroup() %>%
+    arrange(dii) %>%
+    pull(mii)
+}
+```
+
+
+#### e) Create the builder function for step 4.
+```{r}
+kmeans_done <- function(old_means, new_means, eps = 1e-6){
+  om <- as.matrix(select(old_means, -label__))
+  nm <- as.matrix(select(new_means, -label__))
+  m <- mean(sqrt(rowSums((om - nm)^2)))
+  m < eps
+}
+```
+
+
+#### f) Combine them all into your own `kmeans` function.
+```{r}
+mykmeans <- function(data, n_clusters, eps = 1e-6){
+  labels <- label_randomly(nrow(data), n_clusters)
+  old_means <- get_cluster_means(data, labels)
+  done <- FALSE
+  while(!done){
+    labels <- assign_cluster(data, old_means)
+    new_means <- get_cluster_means(data, labels)
+    if(kmeans_done(old_means, new_means)){
+      done <- TRUE
+    } else {
+      old_means <- new_means
+    }
+  }
+  list(labels = labels, means = new_means)
+}
+```
+
+
+## Question 2
+This is when we'll test your `kmeans` function.
+#### a) Read in the `voltages_df.csv` data set. 
+```{r}
+#load in data
+voltage_df <- read.csv("./voltages_df.csv")
+```
+
+
+#### b) Call your `kmeans` function with 3 clusters. Print the results with `results$labels` and `results$means`. 
+
+```{r}
+results_mykmeans <- mykmeans(voltage_df, n_clusters = 3)
+
+print(results_mykmeans$labels)
+print(results_mykmeans$means)
+```
+
+
+#### c) Call R's `kmeans` function with 3 clusters. Print the results with `results$centers` and `results$clusterr`. 
+*Hint*: Use the `as.matrix()` function to make the `voltages_df` data frame a matrix before calling `kmeans()`.
+
+```{r}
+results_Rkmeans <- kmeans(as.matrix(voltage_df), centers = 3)
+
+print(results_Rkmeans$cluster)
+as_tibble(results_Rkmeans$centers)
+
+```
+
+#### d) Are your labels/clusters the same? If not, why? Are your means the same?
+The labels are not the same, but this is expected because the labels are randomly generated in the beginning. Thus, the labels are arbitrary. The means that were calculated are the same across the created kmeans and R's built-in kmeans, but may be under different labels.
+
+## Question 3
+#### a) Explain the process of using a for loop to assign clusters for kmeans.
+It loops over all the points one at a time. It calculates the distance from all the cluster means and determines which is closest. It is essentially a double loop.
+
+#### b) Explain the process of vectorizing the code to assign clusters for kmeans.
+It creates two matrices of data the same size, and it is able to compare the data points to the cluster means at once by subtracting them. 
+
+
+#### c) State which (for loops or vectorizing) is more efficient and why.
+Vectorizing! It repeats entries to create an index vector that then can be easily compared in on vectorized operation.
+
+## Question 4
+#### When does `kmeans` fail? What assumption does `kmeans` use that causes it to fail in this situation?
+Kmeans fails when we do not have spherical Gaussian data with similar standard deviations. For example, if we have two layered rings of groups, kmeans would not be able to classify the "inner" and "outer" rings as groups. It would also fail if we have elongated groups that were not circular in nature. This is because this data is not spherical Gaussian data and they would not be roughly the same size, which is a kmeans assumption.
+
+## Question 5
+#### What assumption do Gaussian mixture models make?
+Gaussian mixture models do not require that each cluster to be the same size because it assumes that the N Gaussian distributions have individual parameters calculated from the data. This allows Gaussian mixture models to identify clusters that are elongated or unequal sizes.
+
+## Question 6
+#### What assumption does spectral clustering make? Why does this help us?
+Special clustering makes very minimal assumptions on the data. It assumes that two points close to one another are likely to be in the same cluster. Because it does not rely on a vector space, it groups two things together by any critera. This helps us because it can identify points in similar clusters based on a criteria (like distance). It then creates a Graph Laplacian, which maps the connections. This then can be runned through kmeans to create clusters.
+
+## Question 7
+#### Define the gap statistic method. What do we use it for?
+The gap statistic method compares the clustering results for different numbers of clusters (k) to randomized data in the same data range. The tightness or density of the observed data is compared to the tightness and density of the randomzied data with the same number of k clusters. This is used to identify the best number of clusters to use to prevent overfitting or underfitting the data.
+
