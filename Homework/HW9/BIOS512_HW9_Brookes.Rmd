@@ -1,0 +1,290 @@
+---
+title: "Homework 9"
+output: pdf_document
+---
+
+# Homework 09
+## Student: Jama Brookes
+This homework is based on the classification and regression lectures.
+```{r, hide}
+library(tidyverse)
+```
+
+
+## Question 1
+#### In the table below, fill in the definition column with a short (no more than two sentence) definition for each vocab word. If it can be summarized by a formula, give the formula. 
+
+| Vocab Word | Definition |
+|:--------|:--------|
+| **One-hot coding** | Converts categories in a column into separate binary/dichotomous columns. |
+| **Feature selection*** | Selects only the most important variables for analysis.  |
+| **Classifier** | A model that assigns inputs to categories instead of numeric values. |
+| **Precision** |  = true positives / (true positives + false positives)  |
+| **Recall** | = true positives / (true positives + false negatives) |
+| **F1 Score** | = 2x( (precision*recall)/(precision+recall) ) |
+| **Parsimonious model** | Simplest form of a model with the fewest parameters. |
+| **Ridge regression** | Helps to not overfit a regression model by adding a penalty term to the loss function that is proportional to the square of the magnitude of the coefficients. |
+| **LASSO regression** | Helps to not overfit a regression model by adding a penalty term to the loss function based on absolute values of the coefficients. |
+| **Cross validation** | Validates the model by separating data into a training set and validation set repeatedly to model performance and generalizability. This can also be done by using k-folds, which splits data into K folds used to test the set and uses data not in the folds to train. |
+| **Tree based methods** | Splits features repeatedly through various decision trees (ie algorithms that make decisions about similarity in our data) to model data. |
+
+*Just give the general idea.
+
+## Question 2 
+#### a) What shape does a perfect classifier look like on an ROC curve? What about a bad classifier?
+A perfect classifier will look like a rectangle (ie a line with a corner hugging the top left corner) and a bad classifier looks like a straight line or y=x.
+#### b) Think about the formula for an F1 score. What does it mean when the F1 score is close to 1? Close to 0?
+If the F1 score is close to 1, it indicates a very good performing model because the model perfectly predicts true positives with no false positives nor false negatives. If the F1 score is close to 0, the model is poorly performing because there are either a lot of false positives or false negatives making precision or recall poor.
+
+## Question 3
+#### Compare the following aspects of linear vs. logistic regression.
+|  | Linear | Logistic |
+|:--------|:--------|:--------|
+| **Chart Shape** | linear | S-shaped |
+| **Dependent Variable Type** | Continuous | Categorical |
+| **Purpose** (regression or classification) | Regression | Classification |
+| **Range of output variable** ($y_i$ or $p_i$) | $y_i$ | $p_i$ |
+| **Method*** | OLS | MLE |
+| **Example of use** | Predict weight gain from calories consumed | Predict probability of heart disease |  
+  
+*Meaning ordinary least squares or maximum likelihood estimation
+
+## Question 4
+#### Why is it important to train then test our model? How do we do that? (2-3 sentences. Not looking for code, just general explanation).
+If we do not train and then test our model, our model may only be valid for the data we have and not valid for other new data and we may overfit. We can first 1) split data for training and test, 2) fit model to the training set and 3) predict on the test set.
+
+## Question 5
+This question runs through a linear regression example. We want to predict median house value based on the other variables.
+#### a) First, load the `housing.csv` data set. Look at the data in some useful way. Why is linear regression appropriate here?
+
+```{r}
+housing_df <- read.csv("./hw9_data/housing.csv")
+
+str(housing_df)
+head(housing_df)
+```
+#### QUESTION 5a ANSWER:
+Linear regression is appropriate because our dependent variable (median_house_value) is continuous and the other predictor variables are also continuous or numerical.
+
+#### b) Scale data and split it 75/25 training/testing. Set seed = 123.
+```{r}
+# Scale data.
+scale <- function(a){
+  (a - min(a))/(max(a)-min(a))
+}
+
+d_num <- housing_df %>% select(where(is.numeric)) %>%
+  mutate(across(where(is.numeric), scale))
+
+head(d_num)
+
+# Set Seed
+set.seed(123)
+
+# Split data - 75% training and 25% testing.
+train <- runif(nrow(d_num)) < 0.75
+test <- !train
+```
+
+#### c) Fit the model.
+```{r}
+f = median_house_value ~  housing_median_age + total_rooms + population + households + median_income + housing_median_age
+
+m <- lm(f, data=d_num %>% filter(train))
+summary(m)
+```
+
+
+#### d) Make predictions on test data and show them in an actual vs. predicted plot.
+
+```{r}
+# Prediction on test data.
+dx <- d_num %>% filter(test)
+
+dx <- dx %>% 
+  mutate(median_house_value_pred = predict(m, dx %>% as.data.frame()))
+
+# Predicted vs actual plot.
+ggplot(dx, aes(median_house_value, median_house_value_pred)) + 
+  geom_point(alpha = 0.5) + 
+  geom_segment(aes(x=0,y=0,xend=1,yend=1), color = "blue") +
+  ggtitle("Predicted vs actual plot of median household value") +
+  theme_classic()
+```
+
+
+#### e) Make a residuals plot.
+
+```{r}
+# Residual density plot.
+ggplot(dx, aes(median_house_value-median_house_value_pred)) + 
+  geom_density()
+
+```
+
+
+## Question 6
+This question runs through a logistic regression example. We want to predict diabetes diagnosis based on the other variables. 
+#### a) First, load the `diabetes.csv` data set. Look at the data in some useful way. Why is logistic regression appropriate here?
+
+```{r}
+diabetes_df <- read.csv("./hw9_data/diabetes.csv")
+
+str(diabetes_df)
+```
+
+#### QUESTION 6a ANSWER:
+Logistic regression is appropiate here because the dependent variable (diabetes diagnosis; "Outcome") is a categorica/dichotomous variable (0/1).
+
+#### b) Scale data and split it 75/25 training/testing. Set seed = 123.
+```{r}
+# Scale
+scale <- function(x){
+  (x - min(x)) / (max(x) - min(x))
+}
+
+d <- diabetes_df %>% as_tibble() %>% filter(complete.cases(.)) %>%
+  filter(complete.cases(.)) %>%
+  transmute(
+    Pregnancies             = Pregnancies %>% scale(),
+    Glucose                = Glucose %>% scale(),
+    BloodPressure          = BloodPressure %>% scale(),
+    SkinThickness          = SkinThickness %>% scale(),
+    Insulin                = Insulin %>% scale(),
+    BMI                    = BMI %>% scale(),
+    DiabetesPedigreeFunction= DiabetesPedigreeFunction %>% scale(),
+    Age                    = Age %>% scale(),
+    Outcome                = Outcome
+  )
+
+d
+
+# Set seed
+set.seed(123)
+
+# Split
+n <- nrow(d)
+train_idx <- sample.int(n, size = floor(0.1 * n))
+d_train <- d %>% slice(train_idx)
+d_test  <- d %>% slice(setdiff(seq_len(n), train_idx))
+
+d_train %>% write_csv("derived_data/diabetes_train.csv")
+d_test  %>% write_csv("derived_data/diabetes_test.csv")
+```
+
+#### c) Fit the model.
+```{r}
+f <- Outcome ~ .
+m <- glm(f, data = d_train, family = binomial())
+
+summary(m)
+
+saveRDS(m, "derived_data/diabetes_logres.rds")
+```
+
+
+#### d) Make predictions on test data. Print a table with the number of true positives, false positives, true negatives, false negatives, and accuracy. 
+
+```{r}
+
+d_test <- read_csv("derived_data/diabetes_test.csv", show_col_types = FALSE)
+m <- readRDS("derived_data/diabetes_logres.rds")
+
+p <- predict(m, newdata = d_test, type = "response")
+pred <- as.integer(p >= 0.5)
+truth <- d_test$Outcome
+
+tp <- sum(pred == 1 & truth == 1)
+fp <- sum(pred == 1 & truth == 0)
+tn <- sum(pred == 0 & truth == 0)
+fn <- sum(pred == 0 & truth == 1)
+acc <- (tp + tn) / (tp + fp + tn + fn)
+
+df <- tibble(
+  measure = c("True Positive", "False Positive", "True Negative", "False Negative", "Accuracy"),
+  value   = c(tp, fp, tn, fn, acc)
+)
+
+df
+```
+
+
+#### e) Fit a LASSO-regularized logistic regression model. Again, set seed = 123. Which variables are the most important (which ones don't go to zero)? How does the LASSO model affect the accuracy?
+
+```{r}
+# Packages
+suppressPackageStartupMessages(library(glmnet))
+suppressPackageStartupMessages(library(broom))
+suppressPackageStartupMessages(library(gridExtra))
+
+# Set Seed
+set.seed(123)
+
+# Load data
+d_train <- read_csv("derived_data/diabetes_train.csv", show_col_types = FALSE)
+d_test  <- read_csv("derived_data/diabetes_test.csv", show_col_types = FALSE)
+
+# Response matrices
+y_train <- d_train$Outcome
+y_test  <- d_test$Outcome
+
+# Predictor matrices
+X_train <- model.matrix(Outcome ~ ., data = d_train)[, -1]
+X_test  <- model.matrix(Outcome ~ ., data = d_test)[, -1]
+
+set.seed(123)
+
+# Fit LASSO with cross-validation
+cvfit <- cv.glmnet(X_train, y_train, alpha = 1, family = "binomial")
+
+# Final LASSO model at best lambda
+best_fit <- glmnet(X_train, y_train, alpha = 1, family = "binomial", lambda = cvfit$lambda.min)
+best_fit$beta
+
+
+# Predict with test data
+lasso_pred_prob <- predict(cvfit, newx = X_test, s = "lambda.min", type = "response")
+lasso_pred <- as.integer (lasso_pred_prob >= 0.5)
+
+# Calculate metrics
+tp <- sum(lasso_pred == 1 & y_test == 1)
+fp <- sum(lasso_pred == 1 & y_test == 0) 
+tn <- sum(lasso_pred == 0 & y_test == 0) 
+fn <- sum(lasso_pred == 0 & y_test == 1)
+acc <- (tp + tn) / (tp + fp + tn + fn)
+
+tibble(
+  measure = c("True Positive", "False Positive", "True Negative", "False Negative", "Accuracy"),
+  value = c(tp, fp, tn, fn, acc))
+
+```
+
+### ANSWER 6e:
+
+Most important variables are Pregnancies, Glucose, and BMI according to the most simplified LASSO model. Since the LASSO simplifies the model by dropping variables that are not needed, it helps to reduce overfitting and slightly improves the accuracy on the test data (0.78 vs 0.76), which we see in our data.
+
+#### f) Make a plot of actual vs. predicted values for the LASSO model.
+
+```{r}
+library(ggplot2)
+
+# Predicted probabilities from LASSO
+lasso_prob <- predict(best_fit, newx = X_test, type = "response")
+
+# Create a tibble for plotting
+plot_df <- tibble(Actual = y_test, Predicted_Prob = as.numeric(lasso_prob))
+
+# Plot: Actual vs Predicted Probability
+ggplot(plot_df, aes(x = Predicted_Prob, y = Actual)) +
+  geom_jitter(height = 0.05, width = 0.1, alpha = 0.6, color = "purple") +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  labs(
+    title = "Actual vs Predicted Probability (LASSO Regression)",
+    x = "Actual Outcome",
+    y = "Predicted Probability") +
+  theme_minimal()
+
+
+```
+
+
